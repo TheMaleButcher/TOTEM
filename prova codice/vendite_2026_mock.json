@@ -1,0 +1,42 @@
+[
+  {
+    "id": "ven_001",
+    "titolo": "Shining",
+    "autore": "Stephen King",
+    "editore": "Bompiani",
+    "anno": 1977,
+    "genere": "thriller"
+  },
+  {
+    "id": "ven_002",
+    "titolo": "Il Suggeritore",
+    "autore": "Donato Carrisi",
+    "editore": "Longanesi",
+    "anno": 2009,
+    "genere": "thriller"
+  },
+  {
+    "id": "ven_003",
+    "titolo": "La Ragazza del Treno",
+    "autore": "Paula Hawkins",
+    "editore": "Piemme",
+    "anno": 2015,
+    "genere": "thriller"
+  },
+  {
+    "id": "ven_004",
+    "titolo": "Orgoglio e Pregiudizio",
+    "autore": "Jane Austen",
+    "editore": "Einaudi",
+    "anno": 2010,
+    "genere": "romanzi rosa"
+  },
+  {
+    "id": "ven_005",
+    "titolo": "Sapiens. Da animali a dèi",
+    "autore": "Yuval Noah Harari",
+    "editore": "Bompiani",
+    "anno": 2014,
+    "genere": "storia"
+  }
+]
