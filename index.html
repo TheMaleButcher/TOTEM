@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flamingo - Libreria dell'usato</title>
+    <style>
+        /* --- RESET E IMPOSTAZIONI BASE --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #a2d5f2;
+            color: #333;
+            overflow: hidden; 
+            -webkit-tap-highlight-color: transparent;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- NASCONDI SCROLLBAR PER LOOK NATIVO KIOSK --- */
+        ::-webkit-scrollbar { display: none; }
+
+        /* --- IL CONTENITORE PADRE --- */
+        #app-wrapper {
+            width: 1920px; height: 1080px; position: relative; overflow: hidden; 
+            box-shadow: 0 0 50px rgba(0,0,0,0.5); 
+        }
+
+        /* --- SCHERMATA HOME INIZIALE --- */
+        #schermata-home {
+            position: absolute; top: 0; left: 0; width: 1920px; height: 1080px;
+            z-index: 200; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background-image: url('background/sfondocielo.jpg');
+            background-size: cover;
+            background-position: center;
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        #schermata-home.nascosta {
+            opacity: 0; transform: scale(1.05); pointer-events: none;
+        }
+        .home-contenitore-bottoni {
+            display: flex; gap: 140px; align-items: center; justify-content: center;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .home-contenitore-bottoni.fade-out {
+            opacity: 0; transform: scale(0.9); pointer-events: none;
+        }
+        .home-btn {
+            width: 580px; height: auto; cursor: pointer;
+            filter: drop-shadow(0px 15px 25px rgba(0,0,0,0.35));
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .home-btn:active { transform: scale(0.94); }
+
+        /* --- FINESTRA DI SCORRIMENTO MAGNETICO --- */
+        #app-window {
+            width: 100%; height: 100%; position: relative; overflow-y: scroll; overflow-x: hidden;
+            scroll-snap-type: y mandatory; 
+            scroll-behavior: smooth;
+            -ms-overflow-style: none; scrollbar-width: none;
+            cursor: grab;
+        }
+        #app-window:active { cursor: grabbing; }
+
+        /* --- IL CONTENUTO SCORREVOLE --- */
+        #scroll-content {
+            width: 1920px; height: 2160px; position: relative; display: flex; flex-direction: column;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.6s ease, opacity 0.6s ease;
+        }
+
+        .sfondo-allontanato { transform: scale(0.92) !important; filter: blur(20px); opacity: 0.5; }
+
+        /* --- LO SFONDO INFALLIBILE --- */
+        #sfondo-assoluto {
+            position: absolute; top: 0; left: 0; width: 1920px; height: 2160px;
+            object-fit: cover; z-index: -1; pointer-events: none; 
+        }
+
+        /* --- MOTORE NUVOLE AMBIENTALI (Z-Index 0) --- */
+        #motore-nuvole { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; overflow: hidden; }
+        .nuvola-sfocata { position: absolute; background: rgba(255, 255, 255, 0.6); border-radius: 50%; filter: blur(120px); will-change: transform; }
+        .n1 { width: 900px; height: 500px; top: 10%; left: -10%; animation: floatCloud 60s infinite alternate ease-in-out; }
+        .n2 { width: 1200px; height: 600px; top: 45%; right: -15%; animation: floatCloudReverse 80s infinite alternate ease-in-out; opacity: 0.8; }
+        .n3 { width: 700px; height: 400px; top: 30%; left: 35%; animation: floatCloud 50s infinite alternate-reverse ease-in-out; opacity: 0.5; }
+        .n4 { width: 1000px; height: 550px; bottom: 5%; left: 5%; animation: floatCloudReverse 70s infinite alternate ease-in-out; }
+
+        @keyframes floatCloud { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(250px, -80px) scale(1.1); } }
+        @keyframes floatCloudReverse { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(-300px, 100px) scale(1.05); } }
+
+        /* NUVOLE IMMAGINE PNG */
+        .nuvola-immagine { position: absolute; filter: blur(4px); will-change: transform, opacity; opacity: 0; }
+        @keyframes floatImageCloud {
+            0% { opacity: 0; transform: translate(0, 0) scaleX(var(--scale-x)) scaleY(var(--scale-y)); }
+            15% { opacity: 0.9; }
+            85% { opacity: 0.9; }
+            100% { opacity: 0; transform: translate(var(--move-x), var(--move-y)) scaleX(var(--scale-x)) scaleY(var(--scale-y)); }
+        }
+
+        /* --- EFFETTO GALLEGGIAMENTO GLOBALE --- */
+        @keyframes floatLento { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes floatMedio { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        @keyframes floatVeloce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+        .galleggio-1 { animation: floatLento 5s ease-in-out infinite; will-change: transform; }
+        .galleggio-2 { animation: floatMedio 6s ease-in-out infinite; will-change: transform; }
+        .galleggio-3 { animation: floatVeloce 4.5s ease-in-out infinite; will-change: transform; }
+
+        /* --- ANIMAZIONE DI ENTRATA (SCALE IN & FADE IN) ISOLATA --- */
+        @keyframes scaleInFadeIn {
+            0% { opacity: 0; transform: scale(0.92); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .animazione-ingresso {
+            opacity: 0;
+            transform: scale(0.92);
+        }
+        .animazione-ingresso.attiva {
+            animation: scaleInFadeIn 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* --- CLASSI BASE TRANSIZIONI E INTERAZIONI --- */
+        .fading-element { transition: opacity 0.5s ease, filter 0.5s ease; }
+        .fade-out { opacity: 0; filter: blur(15px); pointer-events: none; }
+        .transizione-opacita { transition: opacity 0.4s ease-in-out; }
+
+        .interactive {
+            filter: drop-shadow(0px 8px 12px rgba(0, 0, 0, 0.25));
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.3s ease;
+            cursor: pointer; user-select: none; will-change: transform; 
+        }
+        .interactive:active { transform: scale(0.9); filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.15)); }
+
+        /* --- ANIMAZIONI IDLE E MICRO-INTERAZIONI --- */
+        @keyframes idleBoing { 0% { transform: scale(1); } 30% { transform: scale(1.15); } 50% { transform: scale(0.95); } 70% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        @keyframes idleShake { 0% { transform: rotate(0deg); } 20% { transform: rotate(-8deg); } 40% { transform: rotate(8deg); } 60% { transform: rotate(-4deg); } 80% { transform: rotate(4deg); } 100% { transform: rotate(0deg); } }
+        @keyframes idleJump { 0% { transform: translateY(0); } 40% { transform: translateY(-15px); } 60% { transform: translateY(5px); } 80% { transform: translateY(-5px); } 100% { transform: translateY(0); } }
+        @keyframes idleBreathe { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
+        
+        .anim-boing { animation: idleBoing 0.6s ease-in-out; }
+        .anim-shake { animation: idleShake 0.5s ease-in-out; }
+        .anim-jump { animation: idleJump 0.6s ease-in-out; }
+        .anim-breathe { animation: idleBreathe 2s ease-in-out; }
+
+        @keyframes scontoPulseLife { 0%, 100% { transform: scale(1) rotate(0deg); } 4% { transform: scale(1.15) rotate(-6deg); } 8% { transform: scale(0.95) rotate(6deg); } 12% { transform: scale(1.05) rotate(-3deg); } 16% { transform: scale(1) rotate(0deg); } }
+
+        @keyframes fastBoingClick { 0% { transform: scale(1); } 40% { transform: scale(0.88); } 70% { transform: scale(1.04); } 100% { transform: scale(1); } }
+        .anim-fast-boing { animation: fastBoingClick 0.3s ease-out !important; }
+
+        /* --- NAVIGAZIONE FISSA --- */
+        nav { position: fixed; top: 150px; right: 40px; display: flex; flex-direction: column; gap: 20px; z-index: 100; }
+        nav img { width: 100px; height: 100px; }
+
+        #cart-container { position: relative; width: 100px; height: 100px; }
+        #cart-container img { width: 100%; height: 100%; }
+
+        .badge-counter {
+            position: absolute; top: -10px; right: -10px; background-color: #8e44ad; color: white;
+            font-size: 24px; font-weight: bold; width: 45px; height: 45px; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            opacity: 0; transition: opacity 0.3s ease; z-index: 10;
+        }
+        .badge-counter.visible { opacity: 1; }
+
+        @keyframes cartBounce { 0% { transform: scale(1); } 40% { transform: scale(1.3); } 60% { transform: scale(0.9); } 80% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .animazione-carrello { animation: cartBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+        /* --- LE DUE SEZIONI --- */
+        section {
+            width: 1920px; height: 1080px; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; scroll-snap-align: start; 
+            scroll-snap-stop: always; position: relative; z-index: 2; 
+        }
+
+        .palcoscenico { display: flex; align-items: center; gap: 80px; width: 1500px; margin-top: 20px; will-change: transform; }
+        .libro-colonna-sinistra { display: flex; flex-direction: column; align-items: center; gap: 30px; }
+        .libro-principale-container { position: relative; }
+
+        .copertina-grande { width: 450px; height: 650px; object-fit: cover; border-radius: 12px; background-color: #ddd; box-shadow: 10px 15px 25px rgba(0,0,0,0.3); will-change: transform; }
+        .badge-sconto { position: absolute; top: -40px; left: -50px; width: 160px; z-index: 10; animation: scontoPulseLife 3.5s infinite ease-in-out; will-change: transform; }
+
+        .azioni-libro-principale { display: flex; flex-direction: row; align-items: center; gap: 20px; }
+        .icona-ricarica { width: 100px; height: 100px; }
+        .icona-riserva { width: 200px; height: auto; }
+
+        .info-libro { flex: 1; background: rgba(255, 255, 255, 0.85); padding: 50px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); backdrop-filter: blur(10px); }
+        .info-libro h1 { font-size: 60px; color: #d81b60; margin-bottom: 20px; }
+        .info-libro p { font-size: 28px; line-height: 1.5; margin-bottom: 30px; color: #444; }
+        .tags { display: flex; gap: 15px; flex-wrap: wrap; }
+        .tag { background: #d81b60; color: white; padding: 10px 20px; border-radius: 15px; font-size: 20px; font-weight: bold; }
+
+        .griglia-scoperte { display: flex; gap: 80px; will-change: transform; }
+        .libro-scoperta { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .icona-riserva-small { width: 160px; height: auto; }
+        .icona-ricarica-small { width: 100px; height: 100px; }
+
+        .copertina-piccola { width: 350px; height: 500px; object-fit: cover; border-radius: 10px; box-shadow: 5px 10px 20px rgba(0,0,0,0.3); will-change: transform; }
+        .azioni-bottom-scoperta { display: flex; flex-direction: row; align-items: center; gap: 15px; }
+
+        /* --- MODALE I MIEI LIBRI --- */
+        #modale-carrello {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 300; display: flex; justify-content: center; align-items: center;
+            background: rgba(255, 255, 255, 0.15); 
+            opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+        }
+        #modale-carrello.visibile { opacity: 1; pointer-events: auto; }
+        
+        .board-container {
+            position: relative; width: 1550px; height: 850px;
+            transform: translateY(-80px); transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #modale-carrello.visibile .board-container { transform: translateY(0); }
+        
+        .board-sfondo-svg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: contain; z-index: 1; pointer-events: none;
+        }
+        
+        .board-contenuto {
+            position: relative; z-index: 2; width: 100%; height: 100%;
+            padding: 210px 90px 70px 90px; 
+            display: flex; gap: 60px; justify-content: space-between;
+        }
+
+        /* STATO VUOTO DELLA BOARD */
+        .board-contenuto.stato-vuoto .board-destra { display: none; }
+        .board-contenuto.stato-vuoto .paginazione-controlli { display: none; }
+        .board-contenuto.stato-vuoto .board-sinistra { max-width: 100%; width: 100%; justify-content: center; align-items: center; }
+        .carrello-vuoto-msg { color: #8e44ad; font-size: 55px; font-weight: bold; text-align: center; margin-top: -60px; line-height: 1.6; }
+
+        /* Sinistra: Lista Libri */
+        .board-sinistra { flex: 1; display: flex; flex-direction: column; justify-content: space-between; max-width: 950px; }
+        .lista-righe { display: flex; flex-direction: column; gap: 18px; width: 100%; align-items: center;}
+        .riga-libro {
+            width: 100%; background-color: #8e44ad; border-radius: 35px; padding: 0 25px; 
+            display: flex; justify-content: space-between; align-items: center;
+            color: white; font-weight: bold; font-size: 18px; cursor: pointer;
+            transition: background-color 0.3s; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            height: 75px; will-change: transform;
+        }
+        .riga-libro.selezionata { background-color: #d81b60; transform: scale(1.02); }
+        .riga-testo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 720px; text-transform: uppercase; pointer-events: none; }
+        
+        .btn-cancella { width: 65px; height: 65px; cursor: pointer; will-change: transform; }
+
+        /* Paginazione */
+        .paginazione-controlli {
+            display: flex; justify-content: center; align-items: center; gap: 50px; 
+            height: 80px; margin-bottom: 10px; transform: translateY(-20px); 
+        }
+        .freccia-pag { width: 220px; height: auto; cursor: pointer; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.15)); will-change: transform; }
+        .freccia-pag.nascosta { opacity: 0; pointer-events: none; }
+        
+        .punti-pag { display: flex; gap: 30px; }
+        .punto-pag { width: 60px; height: 60px; cursor: pointer; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.15)); will-change: transform; }
+        .punto-pag:active { transform: scale(0.8); } 
+
+        /* Destra: Anteprima e Checkout */
+        .board-destra {
+            width: 380px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 30px; padding-bottom: 10px;
+        }
+        .preview-copertina {
+            width: 320px; height: 460px; object-fit: cover; border-radius: 15px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3); background-color: #eee;
+            border: 12px solid #d81b60; will-change: transform;
+        }
+        .btn-checkout { width: 100%; height: auto; cursor: pointer; filter: drop-shadow(0px 8px 12px rgba(0,0,0,0.25)); will-change: transform; }
+
+        /* --- MODALE CERCAMI --- */
+        #modale-cercami {
+            --cercami-green-dark: #1b5e20;
+            --cercami-green-mid: #388e3c;
+            --cercami-green-light: #81c784;
+            --cercami-green-wash: #e8f5e9;
+            position: absolute; inset: 0; z-index: 350; display: flex; justify-content: center; align-items: stretch;
+            overflow: hidden; background: url('background/sfondocielo.jpg') center / cover no-repeat;
+            opacity: 0; visibility: hidden; pointer-events: none;
+            transition: opacity 0.8s ease, visibility 0s linear 0.8s;
+        }
+        #modale-cercami.visibile {
+            opacity: 1; visibility: visible; pointer-events: auto;
+            transition: opacity 0.8s ease, visibility 0s;
+        }
+        #cercami-nuvole { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+        #app-wrapper.cercami-attivo nav {
+            z-index: 420; top: 40px; right: 40px; flex-direction: row; align-items: center; gap: 18px;
+        }
+        #app-wrapper.cercami-attivo #cart-container { opacity: 1; pointer-events: auto; }
+        .cercami-card {
+            position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            width: 100%; height: 100%; max-height: 100%; overflow-y: auto; padding: 72px 100px 48px;
+            border: 0; border-radius: 0; background: transparent;
+            color: #17491b; text-align: center; text-shadow: 0 1px 12px rgba(255,255,255,0.65);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        }
+        .cercami-card > #intro-screen, .cercami-card > #dynamic-step-container,
+        .cercami-card > #loading-section, .cercami-card > #results-section { width: min(1120px, 100%); }
+        .cercami-card h1 { margin-bottom: 8px; color: #17491b; font-size: 56px; font-weight: 800; }
+        .cercami-sottotitolo { margin-bottom: 26px; color: #245c29; font-size: 24px; font-weight: 700; line-height: 1.5; }
+        .cercami-welcome {
+            margin-bottom: 28px; padding: 14px 30px; border: 0; border-radius: 0;
+            background: linear-gradient(90deg, rgba(232,245,233,0), rgba(232,245,233,0.58), rgba(232,245,233,0));
+            color: #17491b; font-size: 23px; font-weight: 700; line-height: 1.6; text-align: center;
+        }
+        .cercami-step-indicator { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; color: #17491b; font-size: 21px; font-weight: 800; }
+        .cercami-step-dot { width: 12px; height: 12px; border-radius: 50%; background: #d7d0c4; }
+        .cercami-step-dot.attivo { background: linear-gradient(135deg, #2e7d32, #81c784); }
+        .cercami-step { animation: cercamiQuestionIn 1.2s ease both; }
+        .cercami-step.uscita { animation: cercamiQuestionOut 1.1s ease forwards; pointer-events: none; }
+        .cercami-step h2, #loading-section h2, #results-section > h2 {
+            margin-bottom: 28px; color: #143d19; font-size: 42px; font-weight: 800; line-height: 1.35;
+            text-shadow: 0 1px 14px rgba(255,255,255,0.8);
+        }
+        .cercami-fade-in, .cercami-step { animation: cercamiQuestionIn 1.2s ease both; }
+        .cercami-opzioni { display: flex; flex-direction: column; gap: 14px; }
+        .cercami-opzione {
+            padding: 20px 24px; border: 2px solid rgba(46,125,50,0.55); border-radius: 14px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.78), rgba(232,245,233,0.72));
+            color: #17491b; font-size: 27px; font-weight: 800; line-height: 1.4; text-align: left; cursor: pointer; transition: 0.2s ease;
+        }
+        .cercami-opzione:hover, .cercami-tag:hover { border-color: #1b5e20; background: linear-gradient(135deg, rgba(232,245,233,0.9), rgba(200,230,201,0.82)); }
+        .cercami-word-cloud { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-bottom: 26px; }
+        .cercami-tag {
+            padding: 12px 20px; border: 1px solid rgba(46,125,50,0.55); border-radius: 30px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.78), rgba(232,245,233,0.72));
+            color: #17491b; font-size: 23px; font-weight: 700; cursor: pointer;
+        }
+        .cercami-tag.selezionato { border-color: #1b5e20; background: linear-gradient(135deg, #1b5e20, #2e7d32); color: #fff; }
+        .cercami-tag:disabled { opacity: 0.45; cursor: not-allowed; }
+        .cercami-card > #intro-screen > .cercami-btn, #results-section > .cercami-btn { width: 100%; }
+        .cercami-scala { display: flex; justify-content: space-between; gap: 10px; margin: 28px 0 14px; }
+        .cercami-scala-btn {
+            flex: 1; padding: 14px 0; border: 2px solid rgba(46,125,50,0.55); border-radius: 10px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.78), rgba(232,245,233,0.72));
+            color: #17491b; font-size: 25px; font-weight: bold; cursor: pointer;
+        }
+        .cercami-scala-btn:hover, .cercami-scala-btn.selezionato { border-color: #1b5e20; background: linear-gradient(135deg, #1b5e20, #2e7d32); color: #fff; }
+        .cercami-opzione.selezionata { border-color: #388e3c; background: linear-gradient(135deg, rgba(243,250,242,0.94), rgba(200,230,201,0.88)); }
+        .cercami-etichette-scala { display: flex; justify-content: space-between; gap: 12px; color: #17491b; font-size: 20px; font-weight: 700; text-align: left; }
+        .cercami-etichette-scala span:last-child { text-align: right; }
+        .cercami-slider { margin: 30px 0; text-align: left; }
+        .cercami-slider input { width: 100%; height: 8px; accent-color: #388e3c; cursor: pointer; }
+        .cercami-azioni { display: flex; gap: 14px; margin-top: 28px; }
+        .cercami-btn {
+            flex: 1; padding: 17px 22px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #1b5e20, #2e7d32);
+            color: #fff; font-size: 19px; font-weight: bold; cursor: pointer;
+        }
+        .cercami-btn:hover { background: linear-gradient(135deg, #104216, #1b5e20); }
+        .cercami-btn:disabled { background: #dcd6cd; color: #51483f; cursor: not-allowed; }
+        .cercami-btn.secondario { border: 1px solid #b7d8b8; background: #fff; color: #1b5e20; }
+        .cercami-btn.secondario:hover { background: linear-gradient(135deg, #f3faf2, #e3f2e4); }
+        .cercami-risultato {
+            margin: 14px 0; padding: 20px 22px; border: 1px solid rgba(46,125,50,0.4); border-left: 5px solid #388e3c;
+            border-radius: 10px; background: linear-gradient(135deg, rgba(255,255,255,0.84), rgba(232,245,233,0.78)); text-align: left;
+        }
+        .cercami-risultato h3 { margin-bottom: 5px; font-size: 25px; }
+        .cercami-risultato-meta { margin-bottom: 10px; color: #456b49; font-size: 18px; }
+        .cercami-risultato p { color: #244b28; font-size: 20px; font-style: italic; line-height: 1.4; }
+        .cercami-risultato .cercami-btn { width: 100%; margin-top: 14px; padding: 11px; font-size: 16px; }
+        .cercami-risultato .cercami-btn:disabled { background: #dcd6cd; color: #51483f; }
+        #btn-cercami-ricomincia { margin-top: 18px; }
+        .cercami-loader {
+            width: 50px; height: 50px; margin: 26px auto; border: 4px solid #d5e7d5; border-top-color: #388e3c;
+            border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes cercamiQuestionIn {
+            from { opacity: 0; transform: translateY(28px); filter: blur(7px); }
+            to { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+        @keyframes cercamiQuestionOut {
+            from { opacity: 1; transform: translateY(0); filter: blur(0); }
+            to { opacity: 0; transform: translateY(-24px); filter: blur(7px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-wrapper">
+        <!-- SCHERMATA HOME INIZIALE -->
+        <div id="schermata-home">
+            <div class="home-contenitore-bottoni" id="home-bottoni">
+                <img src="icone/iconaSORPRENDIMIHOME.svg" id="btn-home-sorprendimi" class="home-btn interactive icona-animabile galleggio-1" alt="Sorprendimi">
+                <img src="icone/iconaCERCAMIHOME.svg" id="btn-home-cercami" class="home-btn interactive icona-animabile galleggio-2" alt="Cercami">
+            </div>
+        </div>
+
+        <nav class="galleggio-3">
+            <img src="icone/iconaHOME.svg" class="interactive icona-animabile" id="btn-home" alt="Home">
+            <div id="cart-container" class="interactive icona-animabile">
+                <img src="icone/iconaIMIEILIBRI.svg" id="btn-carrello" alt="I Miei Libri">
+                <span id="cart-badge" class="badge-counter">0</span>
+            </div>
+        </nav>
+
+        <div id="app-window">
+            <div id="scroll-content">
+                <img id="sfondo-assoluto" src="background/sfondocielo.jpg" alt="Sfondo Cielo">
+                
+                <div id="motore-nuvole">
+                    <div class="nuvola-sfocata n1"></div>
+                    <div class="nuvola-sfocata n2"></div>
+                    <div class="nuvola-sfocata n3"></div>
+                    <div class="nuvola-sfocata n4"></div>
+                </div>
+
+                <section id="sezione-uno">
+                    <div class="animazione-ingresso" id="wrapper-sezione-1" style="width: 100%; display: flex; justify-content: center; align-items: center;">
+                        <div class="palcoscenico fading-element" id="palco-animato">
+                            <div class="libro-colonna-sinistra galleggio-1">
+                                <div class="libro-principale-container interactive">
+                                    <img src="icone/iconaSCONTO.svg" id="badge-sconto-principale" class="badge-sconto" style="animation-delay: 0s;" alt="Sale">
+                                    <img id="main-cover" src="https://via.placeholder.com/450x650.png?text=Copertina" class="copertina-grande copertina-animabile transizione-opacita" alt="Copertina">
+                                </div>
+                                <div class="azioni-libro-principale">
+                                    <img src="icone/iconaRICARICALIBRO.svg" class="interactive icona-ricarica icona-animabile" id="btn-ricarica-principale" alt="Ricarica Ricerca">
+                                    <img src="icone/iconaRISERVAMI.svg" class="interactive icona-riserva icona-animabile" id="btn-riserva-principale" alt="Riservami">
+                                </div>
+                            </div>
+                            <div class="info-libro transizione-opacita galleggio-2">
+                                <h1 id="main-title">Titolo del Libro</h1>
+                                <p id="main-plot">Trama del libro. L'utente può leggere comodamente i dettagli prima di riservarlo.</p>
+                                <div class="tags" id="main-tags"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="sezione-due">
+                    <div class="animazione-ingresso" id="wrapper-sezione-2" style="width: 100%; display: flex; justify-content: center; align-items: center;">
+                        <div class="griglia-scoperte" id="griglia-alternative"></div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- MODALE I MIEI LIBRI -->
+        <div id="modale-carrello">
+            <div class="board-container">
+                <div class="galleggio-1" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;">
+                    <img src="icone/iconaBOARDIMIEILIBRI.svg" class="board-sfondo-svg" alt="Board Sfondo">
+                    
+                    <div class="board-contenuto">
+                        <div class="board-sinistra">
+                            <div id="lista-libri-carrello" class="lista-righe">
+                                <!-- Popolato da JS -->
+                            </div>
+                            <div class="paginazione-controlli">
+                                <img src="icone/iconaFRECCIASXpiccola.svg" id="btn-carrello-prev" class="freccia-pag nascosta icona-animabile" alt="Indietro">
+                                <div id="punti-paginazione" class="punti-pag">
+                                    <!-- Popolato da JS -->
+                                </div>
+                                <img src="icone/iconaFRECCIADXpiccola.svg" id="btn-carrello-next" class="freccia-pag nascosta icona-animabile" alt="Avanti">
+                            </div>
+                        </div>
+                        
+                        <div class="board-destra">
+                            <img id="preview-copertina-carrello" src="https://via.placeholder.com/320x480.png?text=Preview" class="preview-copertina copertina-animabile" alt="Anteprima">
+                            <img src="icone/iconaPRENDIAMOILVOLO.svg" id="btn-prendiamo-volo" class="btn-checkout icona-animabile" alt="Prendiamo il volo">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="modale-cercami" aria-hidden="true">
+            <div id="cercami-nuvole"></div>
+            <div class="cercami-card" role="dialog" aria-modal="true" aria-labelledby="cercami-titolo">
+                <h1 id="cercami-titolo">CERCAMI</h1>
+                <p class="cercami-sottotitolo">Il consulente letterario digitale della libreria</p>
+
+                <div id="intro-screen">
+                    <div class="cercami-welcome">
+                        Benvenuto nel nostro sistema di ricerca guidata. Per trovare un volume adatto ai tuoi gusti, abbiamo preparato un percorso interattivo.
+                        <br><br>
+                        Il percorso dura circa <strong>3–4 minuti</strong> e approfondisce generi, temi, personaggi, lunghezza e atmosfere. Le domande cambiano a ogni sessione per costruire un profilo di lettura più preciso.
+                    </div>
+                    <button type="button" class="cercami-btn" id="btn-inizia-cercami">Inizia il percorso di ricerca</button>
+                </div>
+
+                <div id="dynamic-step-container" hidden></div>
+
+                <div id="loading-section" hidden>
+                    <div class="cercami-loader" aria-hidden="true"></div>
+                    <h2>Stiamo cercando i titoli più affini...</h2>
+                    <p class="cercami-sottotitolo" id="loading-status">Analisi locale delle risposte e dei metadati del catalogo.</p>
+                </div>
+
+                <div id="results-section" hidden>
+                    <h2>I 3 libri scelti per te tra i nostri scaffali</h2>
+                    <div id="books-container"></div>
+                    <button type="button" class="cercami-btn" id="btn-cercami-ricomincia">Inizia una nuova ricerca</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // DISATTIVA LA MEMORIZZAZIONE AUTOMATICA DELLO SCROLL DEL BROWSER
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+
+        const fallbackCatalogo = [
+            { id: "1", titolo: "Il Signore degli Anelli", autore: "J.R.R. Tolkien", editore: "Bompiani", anno: 2004, genere: "fantasy" },
+            { id: "2", titolo: "IT", autore: "Stephen King", editore: "Sperling", anno: 1986, genere: "thriller" },
+            { id: "3", titolo: "Il Principe", autore: "Machiavelli", editore: "Mondadori", anno: 1532, genere: "classici" },
+            { id: "4", titolo: "1984", autore: "George Orwell", editore: "Mondadori", anno: 1949, genere: "fantascienza" },
+            { id: "5", titolo: "Orgoglio e Pregiudizio", autore: "Jane Austen", editore: "Einaudi", anno: 1813, genere: "romanzi rosa" },
+            { id: "6", titolo: "Sostiene Pereira", autore: "Antonio Tabucchi", editore: "Feltrinelli", anno: 1994, genere: "narrativa" },
+            { id: "7", titolo: "Shining", autore: "Stephen King", editore: "Bompiani", anno: 1977, genere: "thriller" },
+            { id: "8", titolo: "Dracula", autore: "Bram Stoker", editore: "Mondadori", anno: 1897, genere: "horror" },
+            { id: "9", titolo: "Il nome della rosa", autore: "Umberto Eco", editore: "Bompiani", anno: 1980, genere: "giallo storico" }
+        ];
+
+        let catalogo = [];
+        let libroAttuale = null;
+        let libriAlternative = []; 
+        
+        let scontoPrincipale = true;
+        let scontiAlternative = [true, true, true];
+
+        let libriRiservati = [];
+        let carrelloPaginaCorrente = 0;
+        let libroAnteprimaCarrello = null;
+        const LIBRI_PER_PAGINA = 5;
+        const MAX_LIBRI_TOTALI = 15;
+
+        const appWindow = document.getElementById('app-window');
+        const scrollContent = document.getElementById('scroll-content');
+        const modaleCarrello = document.getElementById('modale-carrello');
+        const schermataHome = document.getElementById('schermata-home');
+        const homeBottoni = document.getElementById('home-bottoni');
+        const btnHome = document.getElementById('btn-home');
+        const btnHomeSorprendimi = document.getElementById('btn-home-sorprendimi');
+        const btnHomeCercami = document.getElementById('btn-home-cercami');
+        const wrapperSezione1 = document.getElementById('wrapper-sezione-1');
+        const wrapperSezione2 = document.getElementById('wrapper-sezione-2');
+        const modaleCercami = document.getElementById('modale-cercami');
+        const surveyCercami = [
+            {
+                id: "binaria_1",
+                tipo: "binaria",
+                testo: "Preferisci esplorare fatti storici documentati e persone realmente esistite, oppure immergerti in universi di finzione narrativa?",
+                opzioni: [
+                    { testo: "Fatti veri, storia, saggistica e biografie", valore: "saggistica_storia" },
+                    { testo: "Mondi inventati, romanzi, thriller e narrativa", valore: "narrativa_finzione" }
+                ]
+            },
+            {
+                id: "binaria_2",
+                tipo: "binaria",
+                testo: "Cosa cerchi principalmente in una lettura per il tuo tempo libero?",
+                opzioni: [
+                    { testo: "Adrenalina, pericoli, enigmi e colpi di scena", valore: "tensione_mistero" },
+                    { testo: "Relazioni umane profonde, introspezione ed evoluzione emotiva", valore: "introspezione_emozione" }
+                ]
+            },
+            {
+                id: "binaria_3",
+                tipo: "binaria",
+                testo: "Quale obiettivo ti spinge ad aprire un libro?",
+                opzioni: [
+                    { testo: "Voglio comprendere meglio me stesso, la società o come funziona il mondo", valore: "conoscenza_attualita" },
+                    { testo: "Voglio evadere dalla realtà attraverso il senso della scoperta", valore: "evasione_avventura" }
+                ]
+            },
+            {
+                id: "scala_1",
+                tipo: "scala",
+                testo: "Quanto apprezzi i ritmi di lettura lenti, descrittivi e contemplativi rispetto all'azione rapida?",
+                etichettaMin: "Preferisco l'azione rapida",
+                etichettaMax: "Preferisco la contemplazione lenta"
+            },
+            {
+                id: "scala_2",
+                tipo: "scala",
+                testo: "Quanto ritieni fondamentale che un libro offra un solido bagaglio di dati e concetti concreti?",
+                etichettaMin: "Non è fondamentale",
+                etichettaMax: "È fondamentale"
+            },
+            {
+                id: "scala_3",
+                tipo: "scala",
+                testo: "Quanto ti coinvolgono le storie guidate dalla crescita dei personaggi più che dall'azione?",
+                etichettaMin: "Preferisco trama e azione",
+                etichettaMax: "Preferisco personaggi e relazioni"
+            },
+            {
+                id: "scala_4",
+                tipo: "scala",
+                testo: "Quanto ti interessa approfondire storia, società o psicologia attraverso una lettura?",
+                etichettaMin: "Cerco soprattutto evasione",
+                etichettaMax: "Cerco spunti e approfondimento"
+            },
+            {
+                id: "slider_1",
+                tipo: "slider",
+                testo: "Quale atmosfera letteraria desideri respirare?",
+                etichettaMin: "Classico d'autore e fascino d'altri tempi",
+                etichettaMax: "Iper-contemporaneo e linguaggio moderno"
+            },
+            {
+                id: "lunghezza_impegno",
+                tipo: "scala",
+                categoria: "lunghezza",
+                testo: "Quanto desideri un libro breve e compatto, da leggere d'un fiato, piuttosto che un'opera lunga in cui abitare a lungo?",
+                etichettaMin: "Opera lunga e immersiva",
+                etichettaMax: "Lettura breve e concentrata"
+            },
+            {
+                id: "lunghezza_soglia",
+                tipo: "binaria",
+                categoria: "lunghezza",
+                testo: "Davanti a due volumi che ti incuriosiscono allo stesso modo, cosa ti attira di più oggi?",
+                opzioni: [
+                    { testo: "Un libro agile e contenuto, che entra in tasca o in borsa senza appesantire", valore: "lunghezza_breve" },
+                    { testo: "Un volume corposo e stratificato, che accompagna per settimane", valore: "lunghezza_lunga" }
+                ]
+            },
+            {
+                id: "densita_ritmo",
+                tipo: "slider",
+                categoria: "lunghezza",
+                testo: "Colloca il tuo desiderio di ampiezza narrativa lungo questo percorso:",
+                etichettaMin: "Racconto essenziale, taglio netto",
+                etichettaMax: "Saga ampia, sviluppo di lungo respiro"
+            },
+            {
+                id: "struttura_capitoli",
+                tipo: "scala",
+                categoria: "lunghezza",
+                testo: "Quanto ti aiuta a proseguire la lettura avere capitoli brevi e ritmati rispetto a blocchi narrativi estesi?",
+                etichettaMin: "Preferisco blocchi narrativi ampi",
+                etichettaMax: "Preferisco capitoli brevi e dinamici"
+            },
+            {
+                id: "roleplay_archivio",
+                tipo: "roleplay",
+                categoria: "roleplay",
+                testo: "Stai riordinando la soffitta di una vecchia casa di famiglia e trovi una scatola chiusa con un'etichetta sbiadita e una chiave arrugginita. Qual è il tuo primo impulso?",
+                opzioni: [
+                    { testo: "Cerco di capire a chi apparteneva la scatola e ricostruisco la storia di quella persona", valore: "roleplay_storia_biografia" },
+                    { testo: "La apro con cautela sperando in un segreto nascosto, un enigma o un colpo di scena", valore: "roleplay_mistero_thriller" },
+                    { testo: "Osservo gli oggetti e i dettagli antichi per assaporare l'atmosfera", valore: "roleplay_classici_evocativo" }
+                ]
+            },
+            {
+                id: "roleplay_treno",
+                tipo: "roleplay",
+                categoria: "roleplay",
+                testo: "Sei su un treno notturno in ritardo, fuori piove e hai davanti tre ore libere senza connessione. Come impieghi quel tempo?",
+                opzioni: [
+                    { testo: "Immagino le vite, i conflitti e i pensieri dei passeggeri", valore: "roleplay_narrativa_psicologia" },
+                    { testo: "Mi lascio trascinare in un viaggio lontano, tra rotte ignote o mondi che non esistono", valore: "roleplay_avventura_fantastico" },
+                    { testo: "Approfondisco un tema concreto per tornare a casa con un'idea nuova", valore: "roleplay_saggistica_conoscenza" }
+                ]
+            },
+            {
+                id: "roleplay_stanza",
+                tipo: "roleplay",
+                categoria: "roleplay",
+                testo: "In una vecchia dimora che stai visitando, una porta socchiusa conduce a una stanza poco illuminata. Cosa fai?",
+                opzioni: [
+                    { testo: "Entro con attenzione per verificare se c'è qualcosa di strano o fuori posto", valore: "roleplay_indagine_tensione" },
+                    { testo: "Noto come è arredata e quale epoca rappresenta, immaginando chi ci abbia vissuto", valore: "roleplay_epoca_ambientazione" },
+                    { testo: "Resto sulla soglia e lascio che l'immagine mi suggerisca una riflessione o una storia", valore: "roleplay_introspezione_stile" }
+                ]
+            },
+            {
+                id: "roleplay_incontro",
+                tipo: "roleplay",
+                categoria: "roleplay",
+                testo: "Durante un viaggio in una città che non conosci, una persona del posto ti racconta una vicenda dal finale incerto. Come ti poni?",
+                opzioni: [
+                    { testo: "Chiedo dettagli sui fatti e sui documenti o le cronache che li confermano", valore: "roleplay_fatti_storia" },
+                    { testo: "Mi concentro sulle emozioni del narratore e sui legami tra i personaggi", valore: "roleplay_relazioni_emozioni" },
+                    { testo: "Lascio che il racconto si trasformi in una leggenda o in un'avventura", valore: "roleplay_avventura_immaginazione" }
+                ]
+            },
+            {
+                id: "wordcloud",
+                tipo: "wordcloud",
+                testo: "Seleziona fino a 3 parole chiave che risuonano con il tuo umore di lettura attuale:",
+                tags: [
+                    "Mistero", "Tensione", "Indizi", "Documenti", "Epoche", "Rivoluzioni",
+                    "Società", "Relazioni", "Introspezione", "Passione", "Esplorazione",
+                    "Battaglie", "Mappe", "Ricordi", "Cervello", "Meraviglia", "Magia", "Capolavori",
+                    "Amore", "Amicizia", "Viaggi", "Avventura", "Crimini", "Natura", "Filosofia",
+                    "Famiglia", "Crescita personale", "Umorismo"
+                ]
+            },
+            {
+                id: "generi",
+                tipo: "generi",
+                testo: "Quali generi ti incuriosiscono di più? Selezionane fino a 3:",
+                opzioni: [
+                    { testo: "Gialli e thriller", valore: "thriller" },
+                    { testo: "Fantasy e fantascienza", valore: "fantasy" },
+                    { testo: "Narrativa e romanzi", valore: "narrativa" },
+                    { testo: "Storia e biografie", valore: "storia" },
+                    { testo: "Romanzi rosa", valore: "rosa" },
+                    { testo: "Psicologia", valore: "psicologia" }
+                ]
+            }
+        ];
+        const affinityCercami = {
+            "Mistero": ["mistero", "thriller", "giallo"],
+            "Tensione": ["thriller", "horror"],
+            "Indizi": ["thriller", "giallo"],
+            "Documenti": ["storia", "biografia"],
+            "Epoche": ["storia", "storici", "classici"],
+            "Rivoluzioni": ["storia", "storici"],
+            "Società": ["storia", "psicologia", "narrativa"],
+            "Relazioni": ["rosa", "narrativa"],
+            "Introspezione": ["psicologia", "narrativa"],
+            "Passione": ["rosa", "narrativa"],
+            "Esplorazione": ["fantasy", "fantascienza", "avventura"],
+            "Battaglie": ["storici", "fantasy"],
+            "Mappe": ["fantasy", "fantascienza", "storici"],
+            "Ricordi": ["biografia", "narrativa"],
+            "Cervello": ["medicina", "psicologia"],
+            "Meraviglia": ["fantasy", "fantascienza", "narrativa"],
+            "Magia": ["fantasy", "fantascienza"],
+            "Capolavori": ["classici", "narrativa"],
+            "Amore": ["rosa", "narrativa"],
+            "Amicizia": ["narrativa", "rosa"],
+            "Viaggi": ["narrativa", "fantasy", "storici"],
+            "Avventura": ["fantasy", "fantascienza", "thriller"],
+            "Crimini": ["thriller", "giallo"],
+            "Natura": ["narrativa", "storici"],
+            "Filosofia": ["classici", "psicologia", "storia"],
+            "Famiglia": ["narrativa", "rosa", "biografia"],
+            "Crescita personale": ["psicologia", "biografia"],
+            "Umorismo": ["narrativa"]
+        };
+        const preferenzeBinariCercami = {
+            "saggistica_storia": ["storia", "biografia", "medicina", "psicologia"],
+            "narrativa_finzione": ["narrativa", "romanzi", "fantasy", "fantascienza", "thriller", "giallo"],
+            "tensione_mistero": ["thriller", "horror", "giallo"],
+            "introspezione_emozione": ["rosa", "narrativa", "psicologia", "biografia"],
+            "conoscenza_attualita": ["storia", "biografia", "medicina", "psicologia"],
+            "evasione_avventura": ["fantasy", "fantascienza", "thriller", "romanzi storici"]
+        };
+        const affinityGeneriCercami = {
+            "thriller": ["thriller", "giallo", "horror"],
+            "fantasy": ["fantasy", "fantascienza"],
+            "narrativa": ["narrativa", "romanzi"],
+            "storia": ["storia", "storici", "biografia"],
+            "rosa": ["rosa"],
+            "psicologia": ["psicologia", "medicina"]
+        };
+        const preferenzeRoleplayCercami = {
+            "roleplay_storia_biografia": ["storia", "biografia"],
+            "roleplay_mistero_thriller": ["mistero", "thriller", "giallo"],
+            "roleplay_classici_evocativo": ["classici", "narrativa", "storici"],
+            "roleplay_narrativa_psicologia": ["narrativa", "psicologia", "rosa"],
+            "roleplay_avventura_fantastico": ["avventura", "fantasy", "fantascienza"],
+            "roleplay_saggistica_conoscenza": ["storia", "biografia", "psicologia"],
+            "roleplay_indagine_tensione": ["thriller", "giallo", "horror"],
+            "roleplay_epoca_ambientazione": ["storici", "storia", "classici"],
+            "roleplay_introspezione_stile": ["narrativa", "psicologia"],
+            "roleplay_fatti_storia": ["storia", "biografia", "storici"],
+            "roleplay_relazioni_emozioni": ["narrativa", "rosa"],
+            "roleplay_avventura_immaginazione": ["avventura", "fantasy", "fantascienza"]
+        };
+        const DOMANDE_CERCAMI_SESSIONE = 8;
+        const userSession = { risposteRaccolte: {}, tagSelezionati: [] };
+        let sessionSteps = [];
+        let currentStepIndex = 0;
+        let surveyRunId = 0;
+        let cercamiNuvoleAvviate = false;
+        let transizioneCercamiInCorso = false;
+        let transizioneCercamiId = 0;
+
+        // VARIABILI GLOBALI DONDOLIO
+        let lastScrollY = 0;
+        let targetOffset = 0;
+        let currentOffset = 0;
+
+        async function initApp() {
+            // AZZERAMENTO RIGOROSO ALL'AVVIO
+            appWindow.scrollTop = 0;
+            targetOffset = 0;
+            currentOffset = 0;
+            lastScrollY = 0;
+
+            try {
+                const resCatalogo = await fetch('libri_mock.json');
+                catalogo = await resCatalogo.json();
+            } catch (error) { catalogo = fallbackCatalogo; }
+            
+            creaGrigliaIniziale();
+            processaAlgoritmo();
+            avviaAnimazioniIdle(); 
+            avviaMotoreNuvoleImmagine(); 
+        }
+
+        // --- GESTIONE STATO ACTIVE E TRANSIZIONE HOME -> SORPRENDIMI ---
+        const attivaSorprendimiActive = () => { btnHomeSorprendimi.src = 'icone/iconaSORPRENDIMIHOMEactive.svg'; };
+        const disattivaSorprendimiActive = () => { if(!schermataHome.classList.contains('nascosta')) btnHomeSorprendimi.src = 'icone/iconaSORPRENDIMIHOME.svg'; };
+        const attivaCercamiActive = () => { btnHomeCercami.src = 'icone/iconaCERCAMIHOMEactive.svg'; };
+        const disattivaCercamiActive = () => { if(!schermataHome.classList.contains('nascosta')) btnHomeCercami.src = 'icone/iconaCERCAMIHOME.svg'; };
+
+        btnHomeSorprendimi.addEventListener('mousedown', attivaSorprendimiActive);
+        btnHomeSorprendimi.addEventListener('touchstart', attivaSorprendimiActive, { passive: true });
+        btnHomeCercami.addEventListener('mousedown', attivaCercamiActive);
+        btnHomeCercami.addEventListener('touchstart', attivaCercamiActive, { passive: true });
+
+        window.addEventListener('mouseup', () => {
+            disattivaSorprendimiActive();
+            disattivaCercamiActive();
+        });
+        window.addEventListener('touchend', () => {
+            disattivaSorprendimiActive();
+            disattivaCercamiActive();
+        });
+
+        btnHomeSorprendimi.addEventListener('click', () => {
+            // AZZERAMENTO RIGOROSO PER EVITARE IL DECENTRAMENTO
+            appWindow.scrollTop = 0;
+            targetOffset = 0;
+            currentOffset = 0;
+            lastScrollY = 0;
+
+            // 1. Fade out dei bottoni e della schermata Home
+            homeBottoni.classList.add('fade-out');
+            schermataHome.classList.add('nascosta');
+            
+            // 2. Applica l'animazione di Scale In & Fade In isolata sui wrapper delle sezioni
+            setTimeout(() => {
+                homeBottoni.classList.remove('fade-out');
+                btnHomeSorprendimi.src = 'icone/iconaSORPRENDIMIHOME.svg';
+                
+                wrapperSezione1.classList.add('attiva');
+                wrapperSezione2.classList.add('attiva');
+            }, 400);
+        });
+
+        btnHomeCercami.addEventListener('click', apriCercami);
+        document.getElementById('btn-inizia-cercami').addEventListener('click', iniziaSurvey);
+        document.getElementById('btn-cercami-ricomincia').addEventListener('click', inizializzaCercami);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && modaleCercami.classList.contains('visibile')) chiudiCercami();
+        });
+
+        function apriCercami() {
+            inizializzaCercami();
+            if (!cercamiNuvoleAvviate) {
+                avviaMotoreNuvoleImmagine('cercami-nuvole');
+                cercamiNuvoleAvviate = true;
+            }
+            homeBottoni.classList.add('fade-out');
+            schermataHome.classList.add('nascosta');
+            setTimeout(() => {
+                homeBottoni.classList.remove('fade-out');
+                btnHomeCercami.src = 'icone/iconaCERCAMIHOME.svg';
+                document.getElementById('app-wrapper').classList.add('cercami-attivo');
+                modaleCercami.setAttribute('aria-hidden', 'false');
+                modaleCercami.classList.add('visibile');
+            }, 400);
+        }
+
+        function chiudiCercami() {
+            surveyRunId++;
+            transizioneCercamiId++;
+            transizioneCercamiInCorso = false;
+            modaleCercami.classList.remove('visibile');
+            modaleCercami.setAttribute('aria-hidden', 'true');
+            setTimeout(() => {
+                document.getElementById('app-wrapper').classList.remove('cercami-attivo');
+                schermataHome.classList.remove('nascosta');
+                homeBottoni.classList.remove('fade-out');
+            }, 800);
+        }
+
+        function inizializzaCercami() {
+            surveyRunId++;
+            transizioneCercamiId++;
+            transizioneCercamiInCorso = false;
+            userSession.risposteRaccolte = {};
+            userSession.tagSelezionati = [];
+            sessionSteps = [];
+            currentStepIndex = 0;
+            document.getElementById('intro-screen').hidden = false;
+            document.getElementById('dynamic-step-container').hidden = true;
+            document.getElementById('loading-section').hidden = true;
+            document.getElementById('results-section').hidden = true;
+            document.getElementById('books-container').innerHTML = "";
+        }
+
+        function iniziaSurvey() {
+            document.getElementById('intro-screen').hidden = true;
+            document.getElementById('dynamic-step-container').hidden = false;
+            document.getElementById('loading-section').hidden = true;
+            document.getElementById('results-section').hidden = true;
+            userSession.risposteRaccolte = {};
+            userSession.tagSelezionati = [];
+
+            const domandeMescolate = [...surveyCercami];
+            for (let indice = domandeMescolate.length - 1; indice > 0; indice--) {
+                const indiceCasuale = Math.floor(Math.random() * (indice + 1));
+                [domandeMescolate[indice], domandeMescolate[indiceCasuale]] = [domandeMescolate[indiceCasuale], domandeMescolate[indice]];
+            }
+            const domandeEssenziali = [
+                domandeMescolate.find((step) => step.id === "wordcloud"),
+                domandeMescolate.find((step) => step.id === "generi"),
+                domandeMescolate.find((step) => step.categoria === "lunghezza"),
+                domandeMescolate.find((step) => step.categoria === "roleplay")
+            ];
+            const idEssenziali = new Set(domandeEssenziali.map((step) => step.id));
+            const domandeExtra = domandeMescolate
+                .filter((step) => !idEssenziali.has(step.id))
+                .slice(0, DOMANDE_CERCAMI_SESSIONE - domandeEssenziali.length);
+            sessionSteps = [...domandeEssenziali, ...domandeExtra];
+            for (let indice = sessionSteps.length - 1; indice > 0; indice--) {
+                const indiceCasuale = Math.floor(Math.random() * (indice + 1));
+                [sessionSteps[indice], sessionSteps[indiceCasuale]] = [sessionSteps[indiceCasuale], sessionSteps[indice]];
+            }
+            currentStepIndex = 0;
+            renderStepCercami();
+        }
+
+        function renderStepCercami() {
+            const container = document.getElementById('dynamic-step-container');
+            container.innerHTML = "";
+            if (currentStepIndex >= sessionSteps.length) {
+                container.hidden = true;
+                const loading = document.getElementById('loading-section');
+                loading.hidden = false;
+                loading.classList.remove('cercami-fade-in');
+                void loading.offsetWidth;
+                loading.classList.add('cercami-fade-in');
+                eseguiRicercaCercami();
+                return;
+            }
+
+            const step = sessionSteps[currentStepIndex];
+            const box = document.createElement('div');
+            box.className = "cercami-step";
+
+            const progress = document.createElement('div');
+            progress.className = "cercami-step-indicator";
+            progress.textContent = `Domanda ${currentStepIndex + 1} di ${sessionSteps.length}`;
+            box.appendChild(progress);
+
+            const title = document.createElement('h2');
+            title.textContent = step.testo;
+            box.appendChild(title);
+
+            if (step.tipo === "binaria" || step.tipo === "roleplay") {
+                const options = document.createElement('div');
+                options.className = "cercami-opzioni";
+                step.opzioni.forEach((option) => {
+                    const button = document.createElement('button');
+                    button.type = "button";
+                    button.className = "cercami-opzione" + (userSession.risposteRaccolte[step.id] === option.valore ? " selezionata" : "");
+                    button.textContent = option.testo;
+                    button.setAttribute('aria-pressed', String(userSession.risposteRaccolte[step.id] === option.valore));
+                    button.addEventListener('click', () => {
+                        userSession.risposteRaccolte[step.id] = option.valore;
+                        avanzaStepCercami();
+                    });
+                    options.appendChild(button);
+                });
+                box.appendChild(options);
+            } else if (step.tipo === "scala") {
+                const scale = document.createElement('div');
+                scale.className = "cercami-scala";
+                for (let value = 1; value <= 5; value++) {
+                    const button = document.createElement('button');
+                    button.type = "button";
+                    button.className = "cercami-scala-btn" + (Number(userSession.risposteRaccolte[step.id]) === value ? " selezionato" : "");
+                    button.textContent = String(value);
+                    button.setAttribute('aria-pressed', String(Number(userSession.risposteRaccolte[step.id]) === value));
+                    button.addEventListener('click', () => {
+                        userSession.risposteRaccolte[step.id] = value;
+                        avanzaStepCercami();
+                    });
+                    scale.appendChild(button);
+                }
+                box.appendChild(scale);
+                const labels = document.createElement('div');
+                labels.className = "cercami-etichette-scala";
+                const minimum = document.createElement('span');
+                minimum.textContent = step.etichettaMin;
+                const maximum = document.createElement('span');
+                maximum.textContent = step.etichettaMax;
+                labels.append(minimum, maximum);
+                box.appendChild(labels);
+            } else if (step.tipo === "slider") {
+                const slider = document.createElement('div');
+                slider.className = "cercami-slider";
+                const input = document.createElement('input');
+                input.type = "range";
+                input.min = "1";
+                input.max = "5";
+                input.value = String(userSession.risposteRaccolte[step.id] || 3);
+                input.setAttribute('aria-label', step.testo);
+                const labels = document.createElement('div');
+                labels.className = "cercami-etichette-scala";
+                const minimum = document.createElement('span');
+                minimum.textContent = step.etichettaMin;
+                const maximum = document.createElement('span');
+                maximum.textContent = step.etichettaMax;
+                labels.append(minimum, maximum);
+                slider.append(input, labels);
+                box.appendChild(slider);
+
+                const confirm = document.createElement('button');
+                confirm.type = "button";
+                confirm.className = "cercami-btn";
+                confirm.textContent = "Conferma e prosegui";
+                confirm.style.marginTop = "26px";
+                confirm.addEventListener('click', () => {
+                    userSession.risposteRaccolte[step.id] = Number(input.value);
+                    avanzaStepCercami();
+                });
+                box.appendChild(confirm);
+            } else if (step.tipo === "wordcloud" || step.tipo === "generi") {
+                const cloud = document.createElement('div');
+                cloud.className = "cercami-word-cloud";
+                const isWordCloud = step.tipo === "wordcloud";
+                const opzioni = isWordCloud
+                    ? step.tags.map((tag) => ({ testo: tag, valore: tag }))
+                    : step.opzioni;
+                const getSelectedValues = () => isWordCloud
+                    ? userSession.tagSelezionati
+                    : (userSession.risposteRaccolte[step.id] || []);
+
+                opzioni.forEach((option) => {
+                    const button = document.createElement('button');
+                    button.type = "button";
+                    button.className = "cercami-tag";
+                    button.textContent = option.testo;
+                    button.dataset.value = option.valore;
+                    button.setAttribute('aria-pressed', "false");
+                    button.addEventListener('click', () => {
+                        const selectedValues = getSelectedValues();
+                        const selected = selectedValues.includes(option.valore);
+                        if (selected) {
+                            if (isWordCloud) {
+                                userSession.tagSelezionati = selectedValues.filter((item) => item !== option.valore);
+                            } else {
+                                userSession.risposteRaccolte[step.id] = selectedValues.filter((item) => item !== option.valore);
+                            }
+                        } else if (selectedValues.length < 3) {
+                            if (isWordCloud) {
+                                userSession.tagSelezionati.push(option.valore);
+                            } else {
+                                userSession.risposteRaccolte[step.id] = [...selectedValues, option.valore];
+                            }
+                        }
+                        aggiornaSelezioniCercami(cloud, getSelectedValues(), proceed);
+                    });
+                    cloud.appendChild(button);
+                });
+                box.appendChild(cloud);
+
+                const proceed = document.createElement('button');
+                proceed.type = "button";
+                proceed.className = "cercami-btn";
+                proceed.textContent = "Prosegui";
+                proceed.disabled = getSelectedValues().length === 0;
+                proceed.addEventListener('click', avanzaStepCercami);
+                box.appendChild(proceed);
+                aggiornaSelezioniCercami(cloud, getSelectedValues(), proceed);
+            }
+
+            if (currentStepIndex > 0) {
+                const back = document.createElement('button');
+                back.type = "button";
+                back.className = "cercami-btn secondario";
+                back.textContent = "Indietro";
+                back.style.marginTop = "14px";
+                back.addEventListener('click', () => cambiaStepCercami(-1));
+                box.appendChild(back);
+            }
+            container.appendChild(box);
+        }
+
+        function aggiornaSelezioniCercami(cloud, selectedValues, proceed) {
+            cloud.querySelectorAll('.cercami-tag').forEach((button) => {
+                const selected = selectedValues.includes(button.dataset.value);
+                button.classList.toggle('selezionato', selected);
+                button.setAttribute('aria-pressed', String(selected));
+                button.disabled = !selected && selectedValues.length === 3;
+            });
+            proceed.disabled = selectedValues.length === 0;
+        }
+
+        function avanzaStepCercami() {
+            cambiaStepCercami(1);
+        }
+
+        function cambiaStepCercami(direzione) {
+            if (transizioneCercamiInCorso) return;
+            const stepAttuale = document.querySelector('#dynamic-step-container .cercami-step');
+            if (!stepAttuale) {
+                currentStepIndex += direzione;
+                renderStepCercami();
+                return;
+            }
+
+            transizioneCercamiInCorso = true;
+            stepAttuale.classList.add('uscita');
+            const transitionId = ++transizioneCercamiId;
+            setTimeout(() => {
+                if (transitionId !== transizioneCercamiId || !modaleCercami.classList.contains('visibile')) return;
+                currentStepIndex += direzione;
+                transizioneCercamiInCorso = false;
+                renderStepCercami();
+            }, 1100);
+        }
+
+        function punteggioCercami(libro) {
+            const testoLibro = `${libro.titolo} ${libro.autore} ${libro.genere || ""}`.toLocaleLowerCase('it');
+            const genere = (libro.genere || "").toLocaleLowerCase('it');
+            let score = 0;
+
+            userSession.tagSelezionati.forEach((tag) => {
+                if (affinityCercami[tag].some((termine) => testoLibro.includes(termine))) score += 15;
+            });
+            Object.values(userSession.risposteRaccolte).forEach((risposta) => {
+                const termini = preferenzeBinariCercami[risposta];
+                if (termini && termini.some((termine) => genere.includes(termine))) score += 10;
+
+                const affinitàRoleplay = preferenzeRoleplayCercami[risposta];
+                if (affinitàRoleplay && affinitàRoleplay.some((termine) => genere.includes(termine))) score += 12;
+            });
+
+            const ritmo = Number(userSession.risposteRaccolte.scala_1);
+            if (ritmo <= 2 && /thriller|horror|giallo/.test(genere)) score += 8;
+            if (ritmo >= 4 && /storia|biografia|psicologia|narrativa|classici/.test(genere)) score += 8;
+
+            const concretezza = Number(userSession.risposteRaccolte.scala_2);
+            if (concretezza >= 4 && /storia|biografia|medicina|psicologia/.test(genere)) score += 8;
+
+            const interessePersonaggi = Number(userSession.risposteRaccolte.scala_3);
+            if (interessePersonaggi <= 2 && /thriller|fantasy|fantascienza/.test(genere)) score += 6;
+            if (interessePersonaggi >= 4 && /rosa|narrativa|psicologia|biografia/.test(genere)) score += 6;
+
+            const interesseApprofondimento = Number(userSession.risposteRaccolte.scala_4);
+            if (interesseApprofondimento >= 4 && /storia|biografia|medicina|psicologia/.test(genere)) score += 8;
+
+            const preferenzeLunghezza = [];
+            if (userSession.risposteRaccolte.lunghezza_impegno) {
+                preferenzeLunghezza.push(6 - Number(userSession.risposteRaccolte.lunghezza_impegno));
+            }
+            if (userSession.risposteRaccolte.lunghezza_soglia === "lunghezza_breve") preferenzeLunghezza.push(1);
+            if (userSession.risposteRaccolte.lunghezza_soglia === "lunghezza_lunga") preferenzeLunghezza.push(5);
+            if (userSession.risposteRaccolte.densita_ritmo) {
+                preferenzeLunghezza.push(Number(userSession.risposteRaccolte.densita_ritmo));
+            }
+            if (userSession.risposteRaccolte.struttura_capitoli) {
+                preferenzeLunghezza.push(6 - Number(userSession.risposteRaccolte.struttura_capitoli));
+            }
+            const pagine = Number(libro.pagine || libro.pages || libro.pageCount);
+            if (preferenzeLunghezza.length > 0 && Number.isFinite(pagine) && pagine > 0) {
+                const fasciaLunghezza = pagine < 200 ? 1 : pagine < 350 ? 2 : pagine < 500 ? 3 : pagine < 700 ? 4 : 5;
+                const lunghezzaPreferita = preferenzeLunghezza.reduce((totale, valore) => totale + valore, 0) / preferenzeLunghezza.length;
+                score += Math.max(0, 20 - Math.abs(lunghezzaPreferita - fasciaLunghezza) * 5);
+            }
+
+            (userSession.risposteRaccolte.generi || []).forEach((genereScelto) => {
+                if (affinityGeneriCercami[genereScelto].some((termine) => genere.includes(termine))) score += 15;
+            });
+
+            const anno = Number(libro.anno);
+            const fasciaEpoca = !Number.isFinite(anno) ? 3 : anno < 1900 ? 1 : anno < 1950 ? 2 : anno < 2000 ? 3 : anno < 2015 ? 4 : 5;
+            const preferenzaEpoca = Number(userSession.risposteRaccolte.slider_1 || 3);
+            score += Math.max(0, 8 - Math.abs(preferenzaEpoca - fasciaEpoca) * 2);
+            return score;
+        }
+
+        function microCopyCercami(libro) {
+            const paroleRilevanti = userSession.tagSelezionati.filter((tag) =>
+                affinityCercami[tag].some((termine) => `${libro.titolo} ${libro.genere || ""}`.toLocaleLowerCase('it').includes(termine))
+            );
+            if (paroleRilevanti.length) {
+                const elenco = paroleRilevanti.length > 1
+                    ? `${paroleRilevanti.slice(0, -1).join(", ").toLocaleLowerCase('it')} e ${paroleRilevanti[paroleRilevanti.length - 1].toLocaleLowerCase('it')}`
+                    : paroleRilevanti[0].toLocaleLowerCase('it');
+                return `Il genere ${libro.genere || "narrativo"} incontra la tua curiosità per ${elenco}.`;
+            }
+            const generiSelezionati = userSession.risposteRaccolte.generi || [];
+            const generePreferito = generiSelezionati.find((genere) =>
+                affinityGeneriCercami[genere].some((termine) => (libro.genere || "").toLocaleLowerCase('it').includes(termine))
+            );
+            if (generePreferito) {
+                const opzione = surveyCercami.find((step) => step.id === "generi").opzioni.find((item) => item.valore === generePreferito);
+                return `Una proposta di ${libro.genere || "narrativa"} in linea con il tuo interesse per ${opzione.testo.toLocaleLowerCase('it')}.`;
+            }
+            return `Un titolo di ${libro.genere || "narrativa"} selezionato in base alle preferenze emerse dal tuo percorso.`;
+        }
+
+        function eseguiRicercaCercami() {
+            const runId = ++surveyRunId;
+            document.getElementById('loading-status').textContent = `Valutiamo ${catalogo.length} volumi del catalogo in base alle tue risposte.`;
+            setTimeout(() => {
+                if (runId !== surveyRunId || !modaleCercami.classList.contains('visibile')) return;
+                const risultati = [...catalogo]
+                    .sort((a, b) => punteggioCercami(b) - punteggioCercami(a) || a.titolo.localeCompare(b.titolo, 'it'))
+                    .slice(0, 3);
+                const container = document.getElementById('books-container');
+                container.innerHTML = "";
+
+                risultati.forEach((libro) => {
+                    const card = document.createElement('article');
+                    card.className = "cercami-risultato";
+                    const titolo = document.createElement('h3');
+                    titolo.textContent = libro.titolo;
+                    const meta = document.createElement('div');
+                    meta.className = "cercami-risultato-meta";
+                    meta.textContent = `${libro.autore} · ${libro.anno} · ${libro.editore}`;
+                    const copy = document.createElement('p');
+                    copy.textContent = microCopyCercami(libro);
+                    const reserve = document.createElement('button');
+                    reserve.type = "button";
+                    reserve.className = "cercami-btn";
+                    reserve.textContent = libriRiservati.some((item) => item.id === libro.id) ? "Già riservato" : "Riservami";
+                    reserve.disabled = reserve.textContent === "Già riservato";
+                    reserve.addEventListener('click', () => {
+                        if (aggiungiAlCarrello({ ...libro, sconto: false })) {
+                            reserve.textContent = "Riservato";
+                            reserve.disabled = true;
+                        }
+                    });
+                    card.append(titolo, meta, copy, reserve);
+                    container.appendChild(card);
+                });
+                document.getElementById('loading-section').hidden = true;
+                const results = document.getElementById('results-section');
+                results.hidden = false;
+                results.classList.remove('cercami-fade-in');
+                void results.offsetWidth;
+                results.classList.add('cercami-fade-in');
+            }, 500);
+        }
+
+        // --- GESTIONE PULSANTE HOME DALLA NAVIGAZIONE ---
+        btnHome.addEventListener('click', () => {
+            const cercamiAperto = modaleCercami.classList.contains('visibile');
+            if (libriRiservati.length > 0) {
+                const conferma = confirm("Attenzione! Tornando alla HOME perderai i volumi riservati e la ricerca corrente verrà cancellata. Vuoi procedere?");
+                if (!conferma) return;
+                
+                libriRiservati = [];
+                aggiornaBadgeCarrello();
+            }
+            if (cercamiAperto) chiudiCercami();
+            chiudiModaleCarrello();
+            
+            // AZZERAMENTO RIGOROSO DELLO SCROLL E DEL DONDOLIO
+            appWindow.scrollTo({ top: 0, behavior: 'auto' });
+            targetOffset = 0;
+            currentOffset = 0;
+            lastScrollY = 0;
+            
+            // Rimuovi l'animazione d'ingresso per ripulirla al prossimo ritorno
+            wrapperSezione1.classList.remove('attiva');
+            wrapperSezione2.classList.remove('attiva');
+
+            if (!cercamiAperto) schermataHome.classList.remove('nascosta');
+            processaAlgoritmo();
+        });
+
+        function avviaMotoreNuvoleImmagine(containerId = 'motore-nuvole') {
+            const container = document.getElementById(containerId);
+            let nuvoleAttive = 0;
+            const MAX_NUVOLE = 6;
+
+            function generaNuvola() {
+                if (nuvoleAttive >= MAX_NUVOLE) return;
+                nuvoleAttive++;
+                const img = document.createElement('img');
+                img.src = Math.random() > 0.5 ? 'background/nuvolaA.png' : 'background/nuvolaB.png';
+                img.className = 'nuvola-immagine';
+                const size = Math.floor(Math.random() * 600) + 600; 
+                img.style.width = `${size}px`;
+                img.style.top = `${Math.floor(Math.random() * 85)}%`;
+                img.style.left = `${Math.floor(Math.random() * 85)}%`;
+                
+                const duration = Math.floor(Math.random() * 5000) + 10000; 
+                const moveX = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 200 + 100);
+                const moveY = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 80 + 40);
+                const specchiaX = Math.random() > 0.5 ? 1 : -1;
+                const scaleBase = (Math.random() * 0.2) + 0.9; 
+                
+                img.style.setProperty('--scale-x', scaleBase * specchiaX);
+                img.style.setProperty('--scale-y', scaleBase);
+                img.style.setProperty('--move-x', `${moveX}px`);
+                img.style.setProperty('--move-y', `${moveY}px`);
+
+                img.style.animation = `floatImageCloud ${duration}ms linear forwards`;
+                container.appendChild(img);
+                setTimeout(() => { if(img.parentNode) img.parentNode.removeChild(img); nuvoleAttive--; }, duration);
+            }
+
+            function loopGenerazioneNuvole() {
+                generaNuvola();
+                setTimeout(loopGenerazioneNuvole, Math.floor(Math.random() * 2000) + 3000);
+            }
+            generaNuvola();
+            setTimeout(loopGenerazioneNuvole, 3000);
+        }
+
+        function avviaAnimazioniIdle() {
+            function loopAnimazioneIcone() {
+                const icone = document.querySelectorAll('.icona-animabile');
+                if(icone.length > 0) {
+                    const icona = icone[Math.floor(Math.random() * icone.length)];
+                    const classeAnimazione = Math.random() > 0.5 ? 'anim-boing' : 'anim-shake';
+                    icona.classList.add(classeAnimazione);
+                    setTimeout(() => { icona.classList.remove(classeAnimazione); }, 1000);
+                }
+                setTimeout(loopAnimazioneIcone, Math.floor(Math.random() * (4000 - 2000 + 1) + 2000));
+            }
+
+            function loopAnimazioneCopertine() {
+                const copertine = document.querySelectorAll('.copertina-animabile');
+                if(copertine.length > 0) {
+                    const copertina = copertine[Math.floor(Math.random() * copertine.length)];
+                    const classeAnimazione = Math.random() > 0.5 ? 'anim-jump' : 'anim-breathe';
+                    copertina.classList.add(classeAnimazione);
+                    setTimeout(() => { copertina.classList.remove(classeAnimazione); }, 2000);
+                }
+                setTimeout(loopAnimazioneCopertine, Math.floor(Math.random() * (5000 - 2500 + 1) + 2500));
+            }
+            setTimeout(loopAnimazioneIcone, 1000);
+            setTimeout(loopAnimazioneCopertine, 2000);
+        }
+
+        function getNuovoLibro() {
+            const idEsclusi = [];
+            if (libroAttuale) idEsclusi.push(libroAttuale.id);
+            libriAlternative.forEach(l => { if (l) idEsclusi.push(l.id); });
+            libriRiservati.forEach(l => { if (l) idEsclusi.push(l.id); });
+
+            const libriDisponibili = catalogo.filter(l => !idEsclusi.includes(l.id));
+            if (libriDisponibili.length === 0) return catalogo[Math.floor(Math.random() * catalogo.length)];
+            return libriDisponibili[Math.floor(Math.random() * libriDisponibili.length)];
+        }
+
+        function processaAlgoritmo() {
+            const catalogoMisto = [...catalogo].sort(() => 0.5 - Math.random());
+            libroAttuale = catalogoMisto[0];
+            libriAlternative = [catalogoMisto[1], catalogoMisto[2], catalogoMisto[3]];
+            scontoPrincipale = true;
+            scontiAlternative = [true, true, true];
+            document.getElementById('badge-sconto-principale').style.display = 'block';
+            for(let i=0; i<3; i++) {
+                const badgeAlt = document.getElementById(`badge-sconto-alt-${i}`);
+                if(badgeAlt) badgeAlt.style.display = 'block';
+            }
+            mostraLibroPrincipale(libroAttuale);
+            libriAlternative.forEach((libro, i) => { aggiornaContenutoAlternativo(i, libro); });
+        }
+
+        function mostraLibroPrincipale(libro) {
+            document.getElementById('main-title').textContent = libro.titolo;
+            document.getElementById('main-cover').src = `https://via.placeholder.com/450x650.png?text=${encodeURIComponent(libro.titolo)}`;
+            
+            const tagsContainer = document.getElementById('main-tags');
+            tagsContainer.innerHTML = '';
+            const datiTag = [libro.genere, libro.autore, libro.editore, libro.anno];
+            datiTag.forEach(testo => {
+                if (testo) {
+                    const span = document.createElement('span');
+                    span.className = 'tag';
+                    span.textContent = testo.toString().toUpperCase();
+                    tagsContainer.appendChild(span);
+                }
+            });
+        }
+
+        function creaGrigliaIniziale() {
+            const container = document.getElementById('griglia-alternative');
+            container.innerHTML = '';
+            for(let i=0; i<3; i++) {
+                const div = document.createElement('div');
+                div.className = `libro-scoperta galleggio-${(i % 3) + 1}`;
+                div.id = `alt-book-${i}`;
+                const delaySconto = (Math.random() * 2).toFixed(1);
+
+                div.innerHTML = `
+                    <img src="icone/iconaRISERVAMI.svg" class="interactive icona-riserva-small action-riserva icona-animabile" alt="Riserva">
+                    <div class="libro-principale-container interactive action-scopri transizione-opacita">
+                        <img src="icone/iconaSCONTO.svg" id="badge-sconto-alt-${i}" class="badge-sconto" style="top: -20px; left: -20px; width: 110px; animation-delay: ${delaySconto}s;" alt="Sale">
+                        <img src="" class="copertina-piccola alt-cover copertina-animabile" alt="">
+                    </div>
+                    <div class="azioni-bottom-scoperta">
+                        <span class="tag alt-tag transizione-opacita"></span>
+                        <img src="icone/iconaRICARICALIBRO.svg" class="interactive icona-ricarica-small action-ricarica icona-animabile" alt="Ricarica">
+                    </div>
+                `;
+                
+                div.querySelector('.action-scopri').addEventListener('click', () => { eseguiScambioAnimato(i); });
+                div.querySelector('.action-riserva').addEventListener('click', () => { 
+                    const libroToReserve = { ...libriAlternative[i], sconto: scontiAlternative[i] };
+                    if (aggiungiAlCarrello(libroToReserve)) eseguiRicaricaSingolaAnimata(i, true); 
+                });
+                div.querySelector('.action-ricarica').addEventListener('click', () => { 
+                    if (scontiAlternative[i]) {
+                        if (!confirm("Attenzione! Ricaricando perderai lo sconto del 50% su questa casella. Vuoi procedere?")) return;
+                    }
+                    eseguiRicaricaSingolaAnimata(i, false); 
+                });
+                container.appendChild(div);
+            }
+        }
+
+        function aggiornaContenutoAlternativo(index, libro) {
+            const div = document.getElementById(`alt-book-${index}`);
+            div.querySelector('.alt-cover').src = `https://via.placeholder.com/350x500.png?text=${encodeURIComponent(libro.titolo)}`;
+            div.querySelector('.alt-cover').alt = libro.titolo;
+            div.querySelector('.alt-tag').textContent = libro.genere.toUpperCase();
+        }
+        
+        document.getElementById('btn-ricarica-principale').addEventListener('click', () => {
+            if (scontoPrincipale && !confirm("Attenzione! Ricaricando perderai lo sconto del 50% su questa casella. Vuoi procedere?")) return;
+
+            const mainCover = document.getElementById('main-cover');
+            const mainInfo = document.querySelector('.info-libro');
+            mainCover.style.opacity = '0'; mainInfo.style.opacity = '0';
+
+            setTimeout(() => {
+                libroAttuale = getNuovoLibro();
+                mostraLibroPrincipale(libroAttuale);
+                scontoPrincipale = false;
+                document.getElementById('badge-sconto-principale').style.display = 'none';
+                mainCover.style.opacity = '1'; mainInfo.style.opacity = '1';
+            }, 300);
+        });
+
+        function eseguiRicaricaSingolaAnimata(index, isRiserva) {
+            const div = document.getElementById(`alt-book-${index}`);
+            const altCoverContainer = div.querySelector('.action-scopri');
+            const altTag = div.querySelector('.alt-tag');
+            altCoverContainer.style.opacity = '0'; altTag.style.opacity = '0';
+
+            setTimeout(() => {
+                libriAlternative[index] = getNuovoLibro();
+                aggiornaContenutoAlternativo(index, libriAlternative[index]);
+                scontiAlternative[index] = false;
+                document.getElementById(`badge-sconto-alt-${index}`).style.display = 'none';
+                altCoverContainer.style.opacity = '1'; altTag.style.opacity = '1';
+            }, 300);
+        }
+
+        function eseguiScambioAnimato(index) {
+            const mainCover = document.getElementById('main-cover');
+            const mainInfo = document.querySelector('.info-libro');
+            mainCover.style.opacity = '0'; mainInfo.style.opacity = '0';
+
+            setTimeout(() => {
+                const tempLibro = libroAttuale;
+                libroAttuale = libriAlternative[index];
+                libriAlternative[index] = tempLibro;
+                const tempSconto = scontoPrincipale;
+                scontoPrincipale = scontiAlternative[index];
+                scontiAlternative[index] = tempSconto;
+
+                mostraLibroPrincipale(libroAttuale);
+                aggiornaContenutoAlternativo(index, libriAlternative[index]);
+
+                document.getElementById('badge-sconto-principale').style.display = scontoPrincipale ? 'block' : 'none';
+                document.getElementById(`badge-sconto-alt-${index}`).style.display = scontiAlternative[index] ? 'block' : 'none';
+
+                mainCover.style.opacity = '1'; mainInfo.style.opacity = '1';
+                appWindow.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 300);
+        }
+
+        // --- GESTIONE LOGICA DEL CARRELLO ---
+        function aggiungiAlCarrello(libro) {
+            if (libriRiservati.length >= MAX_LIBRI_TOTALI) {
+                alert(`Hai raggiunto il limite massimo di ${MAX_LIBRI_TOTALI} libri riservati.`);
+                return false;
+            }
+            if (!libriRiservati.some(l => l.id === libro.id)) {
+                libriRiservati.push(libro);
+                aggiornaBadgeCarrello();
+                return true;
+            }
+            return false;
+        }
+
+        function aggiornaBadgeCarrello() {
+            const badge = document.getElementById('cart-badge');
+            const cartContainer = document.getElementById('cart-container');
+            badge.textContent = libriRiservati.length;
+            if(libriRiservati.length > 0) { badge.classList.add('visible'); } else { badge.classList.remove('visible'); }
+            cartContainer.classList.remove('animazione-carrello');
+            void cartContainer.offsetWidth; 
+            cartContainer.classList.add('animazione-carrello');
+        }
+
+        document.getElementById('btn-riserva-principale').addEventListener('click', () => {
+            const libroToReserve = { ...libroAttuale, sconto: scontoPrincipale };
+            if(aggiungiAlCarrello(libroToReserve)){
+                const mainCover = document.getElementById('main-cover');
+                const mainInfo = document.querySelector('.info-libro');
+                mainCover.style.opacity = '0'; mainInfo.style.opacity = '0';
+
+                setTimeout(() => {
+                    libroAttuale = getNuovoLibro();
+                    mostraLibroPrincipale(libroAttuale);
+                    scontoPrincipale = false;
+                    document.getElementById('badge-sconto-principale').style.display = 'none';
+                    mainCover.style.opacity = '1'; mainInfo.style.opacity = '1';
+                }, 300);
+            }
+        });
+
+        // --- LOGICA MODALE I MIEI LIBRI ---
+        document.getElementById('cart-container').addEventListener('click', apriModaleCarrello);
+
+        modaleCarrello.addEventListener('click', (e) => {
+            if (e.target === modaleCarrello) chiudiModaleCarrello();
+        });
+
+        function apriModaleCarrello() {
+            modaleCarrello.classList.add('visibile');
+            scrollContent.classList.add('sfondo-allontanato');
+            carrelloPaginaCorrente = 0;
+            libroAnteprimaCarrello = libriRiservati.length > 0 ? libriRiservati[0] : null;
+            renderizzaCarrello();
+        }
+
+        function chiudiModaleCarrello() {
+            modaleCarrello.classList.remove('visibile');
+            scrollContent.classList.remove('sfondo-allontanato');
+        }
+
+        function renderizzaCarrello() {
+            const listaContainer = document.getElementById('lista-libri-carrello');
+            const puntiContainer = document.getElementById('punti-paginazione');
+            const btnPrev = document.getElementById('btn-carrello-prev');
+            const btnNext = document.getElementById('btn-carrello-next');
+            const copertinaPreview = document.getElementById('preview-copertina-carrello');
+            const boardContenuto = document.querySelector('.board-contenuto');
+            
+            listaContainer.innerHTML = '';
+            puntiContainer.innerHTML = '';
+
+            if (libriRiservati.length === 0) {
+                boardContenuto.classList.add('stato-vuoto');
+                listaContainer.innerHTML = '<div class="carrello-vuoto-msg">Nessun libro riservato.<br>Scopri nuovi titoli per iniziare!</div>';
+                return;
+            }
+
+            boardContenuto.classList.remove('stato-vuoto');
+
+            const numPagine = Math.ceil(libriRiservati.length / LIBRI_PER_PAGINA);
+            if (carrelloPaginaCorrente >= numPagine) carrelloPaginaCorrente = numPagine - 1;
+
+            const startIdx = carrelloPaginaCorrente * LIBRI_PER_PAGINA;
+            const libriPagina = libriRiservati.slice(startIdx, startIdx + LIBRI_PER_PAGINA);
+
+            if (!libroAnteprimaCarrello || !libriRiservati.some(l => l.id === libroAnteprimaCarrello.id)) {
+                libroAnteprimaCarrello = libriPagina[0];
+            }
+
+            if (libroAnteprimaCarrello) {
+                copertinaPreview.src = `https://via.placeholder.com/320x480.png?text=${encodeURIComponent(libroAnteprimaCarrello.titolo)}`;
+            }
+
+            libriPagina.forEach((libro) => {
+                const row = document.createElement('div');
+                const isSelezionata = libroAnteprimaCarrello && libro.id === libroAnteprimaCarrello.id;
+                row.className = 'riga-libro' + (isSelezionata ? ' selezionata' : '');
+                
+                const infoContainer = document.createElement('div');
+                infoContainer.style.display = 'flex';
+                infoContainer.style.alignItems = 'center';
+
+                if (libro.sconto) {
+                    const badge = document.createElement('img');
+                    badge.src = 'icone/iconaSCONTO.svg';
+                    badge.style.width = '45px';
+                    badge.style.height = '45px';
+                    badge.style.marginRight = '15px';
+                    badge.style.filter = 'drop-shadow(0px 2px 4px rgba(0,0,0,0.2))';
+                    infoContainer.appendChild(badge);
+                }
+
+                const testo = document.createElement('div');
+                testo.className = 'riga-testo';
+                testo.textContent = `${libro.titolo} - ${libro.autore} - ${libro.genere}`;
+                infoContainer.appendChild(testo);
+                
+                const btnCancella = document.createElement('img');
+                btnCancella.src = 'icone/iconaCANCELLA.svg';
+                btnCancella.className = 'btn-cancella';
+                
+                row.addEventListener('click', (e) => {
+                    if(e.target !== btnCancella) {
+                        row.classList.remove('anim-fast-boing'); void row.offsetWidth; row.classList.add('anim-fast-boing');
+                        libroAnteprimaCarrello = libro;
+                        setTimeout(() => { renderizzaCarrello(); }, 150);
+                    }
+                });
+
+                btnCancella.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    btnCancella.classList.remove('anim-fast-boing'); void btnCancella.offsetWidth; btnCancella.classList.add('anim-fast-boing');
+                    setTimeout(() => {
+                        if(confirm(`Vuoi rimuovere "${libro.titolo}"?`)) {
+                            libriRiservati = libriRiservati.filter(l => l.id !== libro.id);
+                            aggiornaBadgeCarrello();
+                            renderizzaCarrello();
+                        }
+                    }, 150);
+                });
+
+                row.appendChild(infoContainer);
+                row.appendChild(btnCancella);
+                listaContainer.appendChild(row);
+            });
+
+            if (numPagine > 1) {
+                btnPrev.classList.remove('nascosta');
+                btnNext.classList.remove('nascosta');
+                if (carrelloPaginaCorrente === 0) btnPrev.classList.add('nascosta');
+                if (carrelloPaginaCorrente === numPagine - 1) btnNext.classList.add('nascosta');
+
+                for(let i=0; i<numPagine; i++) {
+                    const punto = document.createElement('img');
+                    punto.className = 'punto-pag icona-animabile';
+                    punto.src = (i === carrelloPaginaCorrente) ? 'icone/iconafinestrapiena.svg' : 'icone/iconafinestravuota.svg';
+                    
+                    punto.addEventListener('click', () => {
+                        carrelloPaginaCorrente = i;
+                        renderizzaCarrello();
+                    });
+                    puntiContainer.appendChild(punto);
+                }
+            } else {
+                btnPrev.classList.add('nascosta');
+                btnNext.classList.add('nascosta');
+            }
+        }
+
+        document.getElementById('btn-carrello-prev').addEventListener('click', function() {
+            this.classList.remove('anim-fast-boing'); void this.offsetWidth; this.classList.add('anim-fast-boing');
+            setTimeout(() => { carrelloPaginaCorrente--; renderizzaCarrello(); }, 150);
+        });
+
+        document.getElementById('btn-carrello-next').addEventListener('click', function() {
+            this.classList.remove('anim-fast-boing'); void this.offsetWidth; this.classList.add('anim-fast-boing');
+            setTimeout(() => { carrelloPaginaCorrente++; renderizzaCarrello(); }, 150);
+        });
+
+        document.getElementById('btn-prendiamo-volo').addEventListener('click', () => {
+            if(libriRiservati.length === 0) return;
+            alert(`Notifica inviata al banco! Hai riservato ${libriRiservati.length} libri.\n(Il totem torna alla schermata principale)`);
+            libriRiservati = [];
+            aggiornaBadgeCarrello();
+            chiudiModaleCarrello();
+            
+            appWindow.scrollTo({ top: 0, behavior: 'auto' });
+            targetOffset = 0;
+            currentOffset = 0;
+            lastScrollY = 0;
+            
+            wrapperSezione1.classList.remove('attiva');
+            wrapperSezione2.classList.remove('attiva');
+            
+            schermataHome.classList.remove('nascosta');
+            processaAlgoritmo();
+        });
+
+        // --- MOTORE DI SWIPE CUSTOM (TOUCH HOLD LENTO E NON SENSIBILE) ---
+        let isDragging = false;
+        let startY = 0;
+        let startScrollY = 0;
+        const dragThreshold = 350;
+
+        appWindow.addEventListener('mousedown', startDrag);
+        appWindow.addEventListener('touchstart', startDrag, { passive: false });
+
+        window.addEventListener('mousemove', drag, { passive: false });
+        window.addEventListener('touchmove', drag, { passive: false });
+
+        window.addEventListener('mouseup', endDrag);
+        window.addEventListener('touchend', endDrag);
+
+        function startDrag(e) {
+            if (modaleCarrello.classList.contains('visibile')) return;
+            if (e.target.closest('.interactive, .btn-cancella, .freccia-pag, .punto-pag, .riga-libro, nav')) return;
+
+            isDragging = true;
+            startY = e.type.includes('mouse') ? e.pageY : e.touches[0].pageY;
+            startScrollY = appWindow.scrollTop;
+
+            appWindow.style.scrollSnapType = 'none';
+            appWindow.style.scrollBehavior = 'auto';
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            if (e.type.includes('touch')) e.preventDefault(); 
+
+            const y = e.type.includes('mouse') ? e.pageY : e.touches[0].pageY;
+            const walk = (startY - y) * 0.5; 
+
+            appWindow.scrollTop = startScrollY + walk;
+        }
+
+        function endDrag(e) {
+            if (!isDragging) return;
+            isDragging = false;
+
+            appWindow.style.scrollBehavior = 'smooth';
+
+            const y = e.type.includes('mouse') ? e.pageY : e.changedTouches[0].pageY;
+            const walk = startY - y;
+
+            if (walk > dragThreshold) {
+                appWindow.scrollTo({ top: 1080, behavior: 'smooth' });
+            } else if (walk < -dragThreshold) {
+                appWindow.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                const targetTop = startScrollY < 540 ? 0 : 1080;
+                appWindow.scrollTo({ top: targetTop, behavior: 'smooth' });
+            }
+
+            setTimeout(() => {
+                appWindow.style.scrollSnapType = 'y mandatory';
+            }, 800);
+        }
+
+        // --- MOTORE FISICO ELASTICO DONDOLIO ---
+        appWindow.addEventListener('scroll', () => {
+            const currentScrollY = appWindow.scrollTop;
+            const fadingElements = document.querySelectorAll('#sezione-uno .fading-element');
+            if (currentScrollY > 150) { fadingElements.forEach(el => el.classList.add('fade-out')); } 
+            else { fadingElements.forEach(el => el.classList.remove('fade-out')); }
+            
+            const delta = currentScrollY - lastScrollY;
+            lastScrollY = currentScrollY;
+            targetOffset += delta * 0.15; 
+            if (targetOffset > 80) targetOffset = 80;
+            if (targetOffset < -80) targetOffset = -80;
+        });
+
+        function animazioneDondolio() {
+            targetOffset *= 0.88;
+            currentOffset += (targetOffset - currentOffset) * 0.10;
+            const palcoAnimato = document.getElementById('palco-animato');
+            const grigliaAlternative = document.getElementById('griglia-alternative');
+            
+            if(palcoAnimato) palcoAnimato.style.transform = `translateY(${-currentOffset}px)`;
+            if(grigliaAlternative) grigliaAlternative.style.transform = `translateY(${-currentOffset}px)`;
+            requestAnimationFrame(animazioneDondolio);
+        }
+        
+        animazioneDondolio();
+        initApp();
+    </script>
+</body>
+</html>
